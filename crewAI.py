@@ -111,6 +111,7 @@ async def hash_domain_name(domain: str) -> str:
     
     # Get the hexadecimal representation of the hash
     return sha256_hash.hexdigest()
+
 async def process_chunk(chunk:str,chunk_number:int,url:str,hashing:str)->ProcessChunk:
     extracted=await get_title_summary(chunk,url)
     embeddings=await get_embeddings(chunk)
@@ -211,7 +212,7 @@ def get_urls(url:str)->List[str]:
         return []
     
 async def main():
-    url="https://docs.phidata.com/"
+    url="https://ai.pydantic.dev/"
     urls=get_urls(url)
     
     if not urls:

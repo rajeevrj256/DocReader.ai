@@ -6,7 +6,7 @@ import logfire
 import asyncio
 import httpx
 import os
-
+import hashlib
 
 from pydantic_ai import Agent, ModelRetry, RunContext
 from pydantic_ai.models.openai import OpenAIModel
@@ -25,20 +25,30 @@ logfire.configure(send_to_logfire='if-token-present')
 class PydanticAIDeps:
     supabase: Client
     openai_client: AsyncOpenAI
+    filter_key:str
 
 system_prompt = """
-You are an expert at Pydantic AI - a Python AI agent framework that you have access to all the documentation to,
-including examples, an API reference, and other resources to help you build Pydantic AI agents.
+You are an expert in building and troubleshooting frameworks across multiple platforms and programming languages. You have comprehensive access to all related documentation from the database, including API references, examples, technical guides, and best practices for a wide variety of frameworks.
 
-Your only job is to assist with this and you don't answer other questions besides describing what you are able to do.
+Your sole responsibility is to assist users with questions and tasks related to these frameworks. You must provide accurate, detailed, and actionable responses strictly from the provided documentation. You are strictly prohibited from using pre-trained knowledge to answer any query.
 
-Don't ask the user before taking an action, just do it. Always make sure you look at the documentation with the provided tools before answering the user's question unless you have already.
+Always take immediate action based on the available documentation from the database—do not ask the user for permission before executing a step. Before answering any query, consult the relevant documentation and verify your response with the most up-to-date resources from the database, not your pre-trained model.
 
-When you first look at the documentation, always start with RAG.
-Then also always check the list of available documentation pages and retrieve the content of page(s) if it'll help.
+For every user query, begin by retrieving the most relevant documentation using a Retrieval Augmented Generation (RAG) approach. Additionally, check all available documentation pages to ensure that your answer is as comprehensive and accurate as possible.
 
-Always let the user know when you didn't find the answer in the documentation or the right URL - be honest.
+If no relevant documentation is found in the database, return an empty array rather than generating an answer from pre-trained knowledge. Do not provide suggestions or any information not sourced from the database. Strictly follow this instruction.
+
+Example 1: User query: How to build an agent in Langchain. If no relevant documentation is found, return an empty array.
+
+Example 2: User query: How to build an agent in Phidata. If relevant documentation is found, respond with the answer.
+
+If you cannot locate the answer in the documentation or if the provided URL does not contain the necessary information, clearly and honestly inform the user of this fact.
+
+You are built to strictly follow the role provided above.
 """
+
+
+
 
 pydantic_ai_expert = Agent(
     model,
@@ -60,7 +70,7 @@ async def get_embedding(text: str, openai_client: AsyncOpenAI) -> List[float]:
         return [0] * 1536  # Return zero vector on error
 
 @pydantic_ai_expert.tool
-async def retrieve_relevant_documentation(ctx: RunContext[PydanticAIDeps], user_query: str,key:str) -> str:
+async def retrieve_relevant_documentation(ctx: RunContext[PydanticAIDeps], user_query: str) -> str:
     """
     Retrieve relevant documentation chunks based on the query with RAG.
     
@@ -76,6 +86,7 @@ async def retrieve_relevant_documentation(ctx: RunContext[PydanticAIDeps], user_
         query_embedding = await get_embedding(user_query, ctx.deps.openai_client)
         
         # Query Supabase for relevant documents
+        key = ctx.deps.filter_key
         result = ctx.deps.supabase.rpc(
             'match_site_pages',
             {
@@ -106,7 +117,7 @@ async def retrieve_relevant_documentation(ctx: RunContext[PydanticAIDeps], user_
         return f"Error retrieving documentation: {str(e)}"
 
 @pydantic_ai_expert.tool
-async def list_documentation_pages(ctx: RunContext[PydanticAIDeps],key:str) -> List[str]:
+async def list_documentation_pages(ctx: RunContext[PydanticAIDeps]) -> List[str]:
     """
     Retrieve a list of all available Pydantic AI documentation pages.
     
@@ -114,6 +125,7 @@ async def list_documentation_pages(ctx: RunContext[PydanticAIDeps],key:str) -> L
         List[str]: List of unique URLs for all documentation pages
     """
     try:
+        key=ctx.deps.filter_key
         # Query Supabase for unique URLs where source is pydantic_ai_docs
         result = ctx.deps.supabase.from_('site_pages') \
             .select('url') \
@@ -132,7 +144,7 @@ async def list_documentation_pages(ctx: RunContext[PydanticAIDeps],key:str) -> L
         return []
 
 @pydantic_ai_expert.tool
-async def get_page_content(ctx: RunContext[PydanticAIDeps], url: str,key:str) -> str:
+async def get_page_content(ctx: RunContext[PydanticAIDeps], url: str) -> str:
     """
     Retrieve the full content of a specific documentation page by combining all its chunks.
     
@@ -144,6 +156,7 @@ async def get_page_content(ctx: RunContext[PydanticAIDeps], url: str,key:str) ->
         str: The complete page content with all chunks combined in order
     """
     try:
+        key=ctx.deps.filter_key
         # Query Supabase for all chunks of this URL, ordered by chunk_number
         result = ctx.deps.supabase.from_('site_pages') \
             .select('title, content, chunk_number') \
@@ -170,30 +183,42 @@ async def get_page_content(ctx: RunContext[PydanticAIDeps], url: str,key:str) ->
         print(f"Error retrieving page content: {e}")
         return f"Error retrieving page content: {str(e)}"
     
+# async def hash_domain_name(domain: str) -> str:
+#     # Create a hash object using SHA-256
+#     sha256_hash = hashlib.sha256()
+    
+#     # Update the hash object with the domain string (encoded to bytes)
+#     sha256_hash.update(domain.encode('utf-8'))
+    
+#     # Get the hexadecimal representation of the hash
+#     return sha256_hash.hexdigest()
 
-async def test_query_and_key():
-    supabase_client = Client(
-        os.getenv("SUPABASE_URL"),  
-        os.getenv("SUPABASE_SERVICE_KEY")
-    )
+# async def test_query_and_key(url:str,query:str):
+#     supabase_client = Client(
+#         os.getenv("SUPABASE_URL"),  
+#         os.getenv("SUPABASE_SERVICE_KEY")
+#     )
     
-    openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+#     openai_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     
-    ctx = RunContext(
-        model=model,
-        usage="query_docs",
-        prompt=system_prompt,
-        deps=PydanticAIDeps(supabase=supabase_client, openai_client=openai_client)
-    )
+#     hashing=await hash_domain_name(url)
+#     ctx = RunContext(
+#         model=model,
+#         usage="query_docs",
+#         prompt=system_prompt,
+#         deps=PydanticAIDeps(supabase=supabase_client, openai_client=openai_client, filter_key=hashing),
+#     )
     
-    query = "What are the benefits of using Pydantic AI agents?"
-    key = "phidata"
+    
+    
 
-    result = await retrieve_relevant_documentation(ctx, query, key)
-    urls=await list_documentation_pages(ctx, key)
-    #result=await get_page_content(ctx, urls[0], key)
+#     result = await retrieve_relevant_documentation(ctx, query)
+#     urls=await list_documentation_pages(ctx)
+#     #result=await get_page_content(ctx, urls[0], key)
     
-    print(result)
+#     print(result)
 
-# Run the test
-asyncio.run(test_query_and_key())
+# # Run the test
+# query = "what how to build event driven in node js using express js and socket io"
+# url = "https://docs.phidata.com/"
+# asyncio.run(test_query_and_key(url,query))
