@@ -211,8 +211,8 @@ def get_urls(url:str)->List[str]:
         print(f"Error getting sitemap: {e}")
         return []
     
-async def main():
-    url="https://ai.pydantic.dev/"
+async def trigger_crawler(url:str):
+    
     urls=get_urls(url)
     
     if not urls:
@@ -221,5 +221,3 @@ async def main():
     hashing=await hash_domain_name(url)
     await crawl_parallel(urls,hashing)
     
-if __name__=="__main__":
-    asyncio.run(main())
