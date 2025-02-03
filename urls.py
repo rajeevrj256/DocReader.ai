@@ -158,12 +158,16 @@ async def main():
         
         st.header("Trained Me")
         url = st.text_input("Enter URL")
-        new_api_key = st.text_input("Enter OpenAI API Key", type="password")
         learn_button = st.button("Learn")
+        st.header("Lets start")
+        url1=st.text_input("Enter Framework URL")
+        start_button = st.button("Start")
+        new_api_key = st.text_input("Enter OpenAI API Key", type="password")
+        
         if new_api_key:
             # Store the API key in session state
             st.session_state["open_ai_api_key"] = new_api_key
-
+        
         # Update the .env file dynamically
             update_env_file("OPENAI_API_KEY", new_api_key)
         
@@ -177,6 +181,16 @@ async def main():
             await trigger_crawler(url)
         else:
             st.warning("Please provide both URL and Metadata.")
+            
+    if start_button:
+        if url1 :
+            print(url1)
+            st.session_state.key = url1 
+            if not new_api_key:
+                st.warning("Please provide OpenAI API Key")
+            else:
+                api_key = os.getenv("OPENAI_API_KEY")
+        
     
     st.markdown(
         """
