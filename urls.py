@@ -11,6 +11,8 @@ from openai import AsyncOpenAI
 import hashlib
 from pydantic_ai import RunContext
 # Import all the message part classes
+
+from crewAI import trigger_crawler
 from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
@@ -64,6 +66,30 @@ def display_message_part(part):
     elif part.part_kind == 'text':
         with st.chat_message("assistant"):
             st.markdown(part.content)          
+
+def update_env_file(key_name, key_value):
+    """Update the .env file with a new API key and reload it."""
+    env_file = ".env"
+
+    # Read existing environment variables
+    env_vars = {}
+    if os.path.exists(env_file):
+        with open(env_file, "r") as file:
+            for line in file:
+                if "=" in line:
+                    var, value = line.strip().split("=", 1)
+                    env_vars[var] = value
+
+    # Update or add the new key
+    env_vars[key_name] = key_value
+
+    # Write back to .env file
+    with open(env_file, "w") as file:
+        for var, value in env_vars.items():
+            file.write(f"{var}={value}\n")
+
+    # Reload environment variables
+    load_dotenv(override=True)
 
 async def hash_domain_name(domain: str) -> str:
     # Create a hash object using SHA-256
@@ -125,6 +151,58 @@ async def run_agent_with_streaming(user_input: str,key: str):
 
 
 async def main():
+    
+    if 'key' not in st.session_state:
+        st.session_state.key = ""
+    with st.sidebar:
+        
+        st.header("Trained Me")
+        url = st.text_input("Enter URL")
+        new_api_key = st.text_input("Enter OpenAI API Key", type="password")
+        learn_button = st.button("Learn")
+        if new_api_key:
+            # Store the API key in session state
+            st.session_state["open_ai_api_key"] = new_api_key
+
+        # Update the .env file dynamically
+            update_env_file("OPENAI_API_KEY", new_api_key)
+        
+    
+    if learn_button:
+        if url :
+            print(url)
+            st.session_state.key = url 
+            api_key = os.getenv("OPENAI_API_KEY")
+            print("YOU AIUR",api_key)
+            await trigger_crawler(url)
+        else:
+            st.warning("Please provide both URL and Metadata.")
+    
+    st.markdown(
+        """
+        <style>
+    .logo {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        z-index: 1000;
+    }
+    .logo-text {
+        font-size: 44px;
+        font-weight: 600;
+        color: white;
+        margin-top: 50px;  /* Adjust the space below the logo */
+    }
+    </style>
+    <div class="logo">
+       
+    </div>
+    <div class="logo-text">
+        🗃️DocReader.ai
+    </div>
+        """, 
+        unsafe_allow_html=True
+    )
     st.title("Your AI Agentic RAG ")
     st.write("Ask any question about any framework, the hidden truths of the beauty of this framework lie within.")
 
@@ -145,8 +223,9 @@ async def main():
 
     if user_input:
         # We append a new request to the conversation explicitly
+        key = st.session_state.key
         st.session_state.messages.append(
-            ModelRequest(parts=[UserPromptPart(content=user_input)])
+            ModelRequest(parts=[UserPromptPart(content=user_input+" provide information from this framework of url "+key)])
         )
         
         # Display user prompt in the UI
@@ -156,9 +235,15 @@ async def main():
         # Display the assistant's partial response while streaming
         with st.chat_message("assistant"):
             # Actually run the agent now, streaming the text
-            key="https://docs.phidata.com/"
-            await run_agent_with_streaming(user_input,key)
+            key = st.session_state.key
+        
+            print(key)
+            if key:  # Ensure key is not empty before running
+                await run_agent_with_streaming(user_input, key)
+            else:
+                st.warning("Please provide a valid URL to proceed.")
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())  # Fix for Windows subprocesses
+    asyncio.run(main())  #
