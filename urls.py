@@ -180,17 +180,17 @@ async def main():
             print("YOU AIUR",api_key)
             await trigger_crawler(url)
         else:
-            st.warning("Please provide both URL and Metadata.")
+            st.warning("Please provide both URL")
             
     if start_button:
         if url1 :
             print(url1)
             st.session_state.key = url1 
-            if not new_api_key:
-                st.warning("Please provide OpenAI API Key")
-            else:
+            if  new_api_key:
                 api_key = os.getenv("OPENAI_API_KEY")
-        
+            else:
+                st.warning("Please provide OpenAI API Key")
+            
     
     st.markdown(
         """

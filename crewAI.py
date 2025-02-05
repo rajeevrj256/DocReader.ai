@@ -217,7 +217,7 @@ async def trigger_crawler(url:str):
     
     if not urls:
         print("No sitemap found")
-        return
+        returnz
     hashing=await hash_domain_name(url)
     await crawl_parallel(urls,hashing)
     
