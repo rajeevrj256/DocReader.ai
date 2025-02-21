@@ -11,6 +11,10 @@ This project is a high-performance documentation retrieval system that leverages
 - RAG-Based AI Agents: Minimizes hallucinations and improves response accuracy.
 - Parallel Processing: Reduces data storage and retrieval time by 50%.
 
+## Deployment
+
+link- https://docreader-ai.onrender.com/
+
 
 ## Installation
 
