@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import Literal, TypedDict
 import asyncio
 import os
-
+import sys
 import streamlit as st
 import json
 import logfire
@@ -259,5 +259,6 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())  # Fix for Windows subprocesses
+    if sys.platform == "win32":
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())  # Fix for Windows subprocesses
     asyncio.run(main())  #
